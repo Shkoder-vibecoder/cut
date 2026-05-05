@@ -4,7 +4,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from db.migrations import reset_db
-from db.session import get_session, close_session
+from db.session import get_session, close_session, reset_engine
 from core.stock_service import StockService
 from core.order_service import OrderService
 from core.material_service import MaterialService
@@ -12,11 +12,14 @@ from datetime import datetime
 
 
 @pytest.fixture
-def session():
+def session(tmp_path):
+    os.environ["CUTTING_DB_PATH"] = str(tmp_path / "test.db")
+    reset_engine()
     reset_db()
     session = get_session()
     yield session
     close_session()
+    reset_engine()
 
 
 class TestStockService:

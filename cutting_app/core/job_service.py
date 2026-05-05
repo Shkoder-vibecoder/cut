@@ -22,7 +22,7 @@ class JobService:
             cut_type=cut_type,
             cut_width=cut_width,
             algorithm=algorithm,
-            status="ожидание",
+            status="pending",
             created_at=datetime.now()
         )
         self.session.add(task)
@@ -44,7 +44,7 @@ class JobService:
             task.status = status
             if kim_percent is not None:
                 task.kim_percent = kim_percent
-            if status in ("завершено", "ошибка"):
+            if status in ("done", "failed"):
                 task.completed_at = datetime.now()
             self.session.commit()
         return task
@@ -60,11 +60,11 @@ class JobService:
 
             self.update_task_status(task_id, "running")
 
-            if params.algorithm == "жадный":
+            if params.algorithm == "greedy":
                 algo = GreedyAlgorithm()
-            elif params.algorithm == "генетический":
+            elif params.algorithm == "genetic":
                 algo = GeneticAlgorithm()
-            elif params.algorithm == "отжиг":
+            elif params.algorithm == "annealing":
                 algo = AnnealingAlgorithm()
             else:
                 algo = GreedyAlgorithm()

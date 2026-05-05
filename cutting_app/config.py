@@ -2,7 +2,12 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATABASE_PATH = os.path.join(BASE_DIR, "cutting_app.db")
+DEFAULT_DATABASE_PATH = os.path.join(BASE_DIR, "cutting_app.db")
+DATABASE_ENV_VAR = "CUTTING_DB_PATH"
+
+
+def get_database_path() -> str:
+    return os.getenv(DATABASE_ENV_VAR, DEFAULT_DATABASE_PATH)
 
 DEFAULT_CUT_WIDTH = 3.0
 DEFAULT_EDGE_OFFSET = 10.0

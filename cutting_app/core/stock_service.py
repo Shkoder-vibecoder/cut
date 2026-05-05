@@ -23,13 +23,15 @@ class StockService:
             defects_json=defects
         )
         self.session.add(sheet)
+        self.session.flush()
 
         movement = InventoryMovement(
-            stock_sheet_id=sheet.id if hasattr(sheet, 'id') else None,
+            stock_sheet_id=sheet.id,
             delta=quantity,
             reason="arrival",
             created_at=datetime.now()
         )
+        self.session.add(movement)
         self.session.commit()
         return sheet
 
@@ -107,18 +109,18 @@ class StockService:
 
     def backup_database(self, backup_path: str) -> bool:
         import shutil
-        from config import DATABASE_PATH
+        from config import get_database_path
         try:
-            shutil.copy2(DATABASE_PATH, backup_path)
+            shutil.copy2(get_database_path(), backup_path)
             return True
         except Exception:
             return False
 
     def restore_database(self, backup_path: str) -> bool:
         import shutil
-        from config import DATABASE_PATH
+        from config import get_database_path
         try:
-            shutil.copy2(backup_path, DATABASE_PATH)
+            shutil.copy2(backup_path, get_database_path())
             return True
         except Exception:
             return False

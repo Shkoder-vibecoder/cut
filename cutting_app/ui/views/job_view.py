@@ -1,9 +1,35 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QLabel, QComboBox, QDoubleSpinBox, QSpinBox, QMessageBox, QProgressBar, QFormLayout
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QLabel,
+    QComboBox,
+    QDoubleSpinBox,
+    QMessageBox,
+    QProgressBar,
+    QFormLayout,
+)
 from algorithms.base import CuttingParams, Sheet, Piece
 from algorithms.greedy import GreedyAlgorithm
 from algorithms.genetic import GeneticAlgorithm
 from algorithms.annealing import AnnealingAlgorithm
+
+
+ALGORITHM_LABELS = {
+    "greedy": "Жадный",
+    "genetic": "Генетический",
+    "annealing": "Отжиг",
+}
+
+TASK_STATUS_LABELS = {
+    "pending": "Ожидание",
+    "running": "Выполняется",
+    "done": "Готово",
+    "failed": "Ошибка",
+}
 
 
 class JobView(QWidget):
@@ -19,48 +45,45 @@ class JobView(QWidget):
         layout = QVBoxLayout(self)
 
         top_layout = QHBoxLayout()
-
         order_label = QLabel("Заказ:")
         self.order_combo = QComboBox()
         self._load_orders()
         self.btn_refresh_orders = QPushButton("Обновить")
         self.btn_refresh_orders.clicked.connect(self._load_orders)
-
         top_layout.addWidget(order_label)
         top_layout.addWidget(self.order_combo)
         top_layout.addWidget(self.btn_refresh_orders)
         top_layout.addStretch()
-
         layout.addLayout(top_layout)
 
         params_group = QWidget()
         params_layout = QFormLayout(params_group)
 
         self.cut_type_combo = QComboBox()
-        self.cut_type_combo.addItems(["свободный", "гильотинный"])
-        self.cut_type_combo.setToolTip("Свободный - любой раскрой, Гильотинный - только прямолинейные резы")
+        self.cut_type_combo.addItem("Свободный", "free")
+        self.cut_type_combo.addItem("Гильотинный", "guillotine")
+        self.cut_type_combo.setToolTip("Тип схемы раскроя")
 
         self.algorithm_combo = QComboBox()
-        self.algorithm_combo.addItems(["жадный", "генетический", "отжиг"])
-        self.algorithm_combo.setToolTip("Жадный - быстро, Генетический - качественнее, Отжиг - комбинированный")
+        self.algorithm_combo.addItem("Жадный", "greedy")
+        self.algorithm_combo.addItem("Генетический", "genetic")
+        self.algorithm_combo.addItem("Отжиг", "annealing")
+        self.algorithm_combo.setToolTip("Алгоритм оптимизации")
 
         self.cut_width_spin = QDoubleSpinBox()
         self.cut_width_spin.setRange(0.1, 20.0)
         self.cut_width_spin.setValue(3.0)
         self.cut_width_spin.setSuffix(" мм")
-        self.cut_width_spin.setToolTip("Ширина реза пильного диска или режущей кромки")
 
         self.edge_offset_spin = QDoubleSpinBox()
         self.edge_offset_spin.setRange(0, 50.0)
         self.edge_offset_spin.setValue(10.0)
         self.edge_offset_spin.setSuffix(" мм")
-        self.edge_offset_spin.setToolTip("Технологический отступ от края листа")
 
         params_layout.addRow("Тип раскроя:", self.cut_type_combo)
         params_layout.addRow("Алгоритм:", self.algorithm_combo)
         params_layout.addRow("Ширина реза:", self.cut_width_spin)
         params_layout.addRow("Отступ от края:", self.edge_offset_spin)
-
         layout.addWidget(params_group)
 
         self.progress_bar = QProgressBar()
@@ -70,15 +93,12 @@ class JobView(QWidget):
         self.btn_start = QPushButton("Рассчитать раскрой")
         self.btn_view_result = QPushButton("Просмотр результата")
         self.btn_tasks_history = QPushButton("История заданий")
-
         self.btn_start.clicked.connect(self._start_cutting)
         self.btn_view_result.clicked.connect(self._view_result)
         self.btn_tasks_history.clicked.connect(self._show_tasks_history)
-
         btn_layout.addWidget(self.btn_start)
         btn_layout.addWidget(self.btn_view_result)
         btn_layout.addWidget(self.btn_tasks_history)
-
         layout.addLayout(btn_layout)
 
         self.status_label = QLabel("Выберите заказ и нажмите 'Рассчитать раскрой'")
@@ -86,27 +106,33 @@ class JobView(QWidget):
 
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(6)
-        self.results_table.setHorizontalHeaderLabels(["ID", "Заказ", "Алгоритм", "КИМ %", "Статус", "Время, сек"])
+        self.results_table.setHorizontalHeaderLabels(
+            ["ID", "Заказ", "Алгоритм", "КИМ %", "Статус", "Время"]
+        )
         layout.addWidget(self.results_table)
-
         self._load_tasks()
 
     def _load_orders(self):
         self.order_combo.clear()
-        orders = self.order_service.get_all_orders()
-        for o in orders:
-            self.order_combo.addItem(o.order_number, o.order_number)
+        for order in self.order_service.get_all_orders():
+            self.order_combo.addItem(order.order_number, order.order_number)
 
     def _load_tasks(self):
         tasks = self.job_service.get_all_tasks()
         self.results_table.setRowCount(len(tasks))
-        for i, t in enumerate(tasks):
-            self.results_table.setItem(i, 0, QTableWidgetItem(str(t.id)))
-            self.results_table.setItem(i, 1, QTableWidgetItem(t.order_id))
-            self.results_table.setItem(i, 2, QTableWidgetItem(t.algorithm))
-            self.results_table.setItem(i, 3, QTableWidgetItem(f"{t.kim_percent:.2f}" if t.kim_percent else "-"))
-            self.results_table.setItem(i, 4, QTableWidgetItem(t.status))
-            calc_time = str(t.completed_at - t.created_at) if t.completed_at else "-"
+        for i, task in enumerate(tasks):
+            self.results_table.setItem(i, 0, QTableWidgetItem(str(task.id)))
+            self.results_table.setItem(i, 1, QTableWidgetItem(task.order_id))
+            self.results_table.setItem(
+                i, 2, QTableWidgetItem(ALGORITHM_LABELS.get(task.algorithm, task.algorithm))
+            )
+            self.results_table.setItem(
+                i, 3, QTableWidgetItem(f"{task.kim_percent:.2f}" if task.kim_percent else "-")
+            )
+            self.results_table.setItem(
+                i, 4, QTableWidgetItem(TASK_STATUS_LABELS.get(task.status, task.status))
+            )
+            calc_time = str(task.completed_at - task.created_at) if task.completed_at else "-"
             self.results_table.setItem(i, 5, QTableWidgetItem(calc_time))
         self.results_table.resizeColumnsToContents()
 
@@ -114,10 +140,6 @@ class JobView(QWidget):
         order_number = self.order_combo.currentData()
         if not order_number:
             QMessageBox.warning(self, "Внимание", "Выберите заказ")
-            return
-
-        order = self.order_service.get_order(order_number)
-        if not order:
             return
 
         items = self.order_service.get_order_items(order_number)
@@ -131,48 +153,49 @@ class JobView(QWidget):
             return
 
         sheets = []
-        for s in stock_sheets:
-            if s.quantity > 0:
-                sheets.append(Sheet(
-                    id=s.id,
-                    width=s.format.width_mm,
-                    height=s.format.height_mm,
-                    stock_sheet_id=s.id,
-                    texture=s.texture,
-                    quantity=s.quantity
-                ))
+        for stock in stock_sheets:
+            if stock.quantity > 0:
+                sheets.append(
+                    Sheet(
+                        id=stock.id,
+                        width=stock.format.width_mm,
+                        height=stock.format.height_mm,
+                        stock_sheet_id=stock.id,
+                        texture=stock.texture,
+                        quantity=stock.quantity,
+                    )
+                )
 
         pieces = []
         for item in items:
             for _ in range(item.quantity):
-                pieces.append(Piece(
-                    id=item.id,
-                    order_item_id=item.id,
-                    name=item.name,
-                    width=item.width_mm,
-                    height=item.height_mm,
-                    rotation_allowed=item.rotation,
-                    fibers=item.fibers,
-                    priority=item.priority
-                ))
+                pieces.append(
+                    Piece(
+                        id=item.id,
+                        order_item_id=item.id,
+                        name=item.name,
+                        width=item.width_mm,
+                        height=item.height_mm,
+                        rotation_allowed=item.rotation,
+                        fibers=item.fibers,
+                        priority=item.priority,
+                    )
+                )
 
         params = CuttingParams(
             cut_width=self.cut_width_spin.value(),
             edge_offset=self.edge_offset_spin.value(),
-            cut_type=self.cut_type_combo.currentText(),
-            algorithm=self.algorithm_combo.currentText()
+            cut_type=self.cut_type_combo.currentData(),
+            algorithm=self.algorithm_combo.currentData(),
         )
 
         self.progress_bar.setValue(10)
         self.status_label.setText("Запуск алгоритма...")
-
         self.btn_start.setEnabled(False)
-
         self._run_algorithm(sheets, pieces, params, order_number)
 
     def _run_algorithm(self, sheets, pieces, params, order_number):
         algo_name = params.algorithm
-
         if algo_name == "greedy":
             algo = GreedyAlgorithm()
         elif algo_name == "genetic":
@@ -182,10 +205,12 @@ class JobView(QWidget):
         else:
             algo = GreedyAlgorithm()
 
+        import time
+        from datetime import datetime
+        from db.models import TaskSheet, Placement, StockSheet, InventoryMovement, TaskOrderItemLink
+
         self.progress_bar.setValue(30)
         self.status_label.setText("Выполняется оптимизация...")
-
-        import time
         start_time = time.time()
         result = algo.solve(sheets, pieces, params)
         calc_time = time.time() - start_time
@@ -197,68 +222,68 @@ class JobView(QWidget):
             order_id=order_number,
             cut_width=params.cut_width,
             algorithm=params.algorithm,
-            cut_type=params.cut_type
+            cut_type=params.cut_type,
         )
-
-        from db.models import TaskSheet, Placement, StockSheet, InventoryMovement, TaskOrderItemLink
-        from datetime import datetime
 
         sheet_map = {}
         for placement in result.placements:
             if placement.sheet_id not in sheet_map:
-                stock_sheet = self.session.query(StockSheet).filter(StockSheet.id == placement.sheet_id).first()
-                if stock_sheet:
-                    task_sheet = TaskSheet(
-                        task_id=task.id,
-                        stock_sheet_id=placement.sheet_id,
-                        sheet_index=len(sheet_map),
-                        waste_mm2=0.0
-                    )
-                    self.session.add(task_sheet)
-                    self.session.flush()
-                    sheet_map[placement.sheet_id] = task_sheet
+                stock_sheet = (
+                    self.session.query(StockSheet)
+                    .filter(StockSheet.id == placement.sheet_id)
+                    .first()
+                )
+                if not stock_sheet:
+                    continue
 
-                    movement = InventoryMovement(
-                        stock_sheet_id=placement.sheet_id,
-                        task_id=task.id,
-                        delta=-1,
-                        reason="cutting",
-                        created_at=datetime.now()
-                    )
-                    self.session.add(movement)
+                task_sheet = TaskSheet(
+                    task_id=task.id,
+                    stock_sheet_id=placement.sheet_id,
+                    sheet_index=len(sheet_map),
+                    waste_mm2=0.0,
+                )
+                self.session.add(task_sheet)
+                self.session.flush()
+                sheet_map[placement.sheet_id] = task_sheet
 
-                    if stock_sheet.quantity > 0:
-                        stock_sheet.quantity -= 1
+                movement = InventoryMovement(
+                    stock_sheet_id=placement.sheet_id,
+                    task_id=task.id,
+                    delta=-1,
+                    reason="cutting",
+                    created_at=datetime.now(),
+                )
+                self.session.add(movement)
+                if stock_sheet.quantity > 0:
+                    stock_sheet.quantity -= 1
 
             task_sheet = sheet_map.get(placement.sheet_id)
             if task_sheet:
-                placement_obj = Placement(
-                    task_sheet_id=task_sheet.id,
-                    order_item_id=placement.piece_id,
-                    x_mm=placement.x,
-                    y_mm=placement.y,
-                    width_mm=placement.width,
-                    height_mm=placement.height,
-                    rotated=placement.rotated
+                self.session.add(
+                    Placement(
+                        task_sheet_id=task_sheet.id,
+                        order_item_id=placement.piece_id,
+                        x_mm=placement.x,
+                        y_mm=placement.y,
+                        width_mm=placement.width,
+                        height_mm=placement.height,
+                        rotated=placement.rotated,
+                    )
                 )
-                self.session.add(placement_obj)
-
-                link = TaskOrderItemLink(
-                    task_id=task.id,
-                    order_item_id=placement.piece_id
+                self.session.add(
+                    TaskOrderItemLink(task_id=task.id, order_item_id=placement.piece_id)
                 )
-                self.session.add(link)
 
         task.kim_percent = result.kim_percent
         task.status = "done"
         task.completed_at = datetime.now()
-
         self.session.commit()
 
         self.progress_bar.setValue(100)
-        self.status_label.setText(f"Готово. КИМ: {result.kim_percent:.2f}%, Время: {calc_time:.2f} сек")
+        self.status_label.setText(
+            f"Готово. КИМ: {result.kim_percent:.2f}%, Время: {calc_time:.2f} сек"
+        )
         self.btn_start.setEnabled(True)
-
         self._load_tasks()
 
     def _view_result(self):
@@ -266,28 +291,9 @@ class JobView(QWidget):
         if row < 0:
             QMessageBox.warning(self, "Внимание", "Выберите задание")
             return
-
-        task_id = int(self.results_table.item(row, 0).text())
-        from ui.main_window import MainWindow
         main_win = self.window()
-        if hasattr(main_win, 'tabs'):
+        if hasattr(main_win, "tabs"):
             main_win.tabs.setCurrentIndex(4)
 
     def _show_tasks_history(self):
         self._load_tasks()
-
-
-class CuttingWorker(QThread):
-    finished = pyqtSignal(object)
-    progress = pyqtSignal(int)
-
-    def __init__(self, algo, sheets, pieces, params):
-        super().__init__()
-        self.algo = algo
-        self.sheets = sheets
-        self.pieces = pieces
-        self.params = params
-
-    def run(self):
-        result = self.algo.solve(self.sheets, self.pieces, self.params)
-        self.finished.emit(result)

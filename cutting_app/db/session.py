@@ -1,17 +1,20 @@
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
-from config import DATABASE_PATH
+from config import get_database_path
 import threading
 
 _engine = None
 _session_factory = None
+_engine_db_path = None
 _lock = threading.local()
 
 
 def get_engine():
-    global _engine
-    if _engine is None:
-        _engine = create_engine(f"sqlite:///{DATABASE_PATH}", echo=False)
+    global _engine, _engine_db_path
+    db_path = get_database_path()
+    if _engine is None or _engine_db_path != db_path:
+        _engine = create_engine(f"sqlite:///{db_path}", echo=False)
+        _engine_db_path = db_path
     return _engine
 
 
@@ -45,3 +48,10 @@ def commit_with_retry(session: Session, max_retries: int = 3):
             if attempt == max_retries - 1:
                 raise e
     return False
+
+
+def reset_engine():
+    global _engine, _session_factory, _engine_db_path
+    _engine = None
+    _session_factory = None
+    _engine_db_path = None
