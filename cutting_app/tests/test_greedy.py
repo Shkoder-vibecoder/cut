@@ -18,8 +18,8 @@ class TestGreedyAlgorithm:
 
         assert result.status == "done"
         assert len(result.placements) == 1
-        assert result.placements[0].x == 0
-        assert result.placements[0].y == 0
+        assert result.placements[0].x == 10
+        assert result.placements[0].y == 10
 
     def test_multiple_pieces(self):
         sheets = [Sheet(id=1, width=1000, height=1000, stock_sheet_id=1, texture="none")]
@@ -83,6 +83,25 @@ class TestSheetState:
         state = SheetState(1, 1000, 1000, 1, "none")
         state.add_placement(0, 0, 500, 500, 3.0)
         assert state.can_place(503, 0, 200, 200, 3.0, 10.0) is True
+
+    def test_edge_offset_respected(self):
+        sheets = [Sheet(id=1, width=200, height=200, stock_sheet_id=1, texture="none")]
+        pieces = [Piece(id=1, order_item_id=1, name="P", width=190, height=190, quantity=1)]
+
+        algo = GreedyAlgorithm()
+        params = CuttingParams(cut_width=0, edge_offset=10)
+        result = algo.solve(sheets, pieces, params)
+
+        assert len(result.placements) == 0
+
+    def test_guillotine_constraint_check(self):
+        state = SheetState(1, 1000, 1000, 1, "none")
+        state.add_placement(10, 10, 400, 400, 3.0)
+        assert state.can_place_guillotine(100, 100, 3.0, 10.0, 1000.0) is True
+
+    def test_guillotine_depth_limit(self):
+        state = SheetState(1, 1000, 1000, 1, "none")
+        assert state.can_place_guillotine(100, 300, 3.0, 10.0, 200.0) is False
 
 
 if __name__ == "__main__":

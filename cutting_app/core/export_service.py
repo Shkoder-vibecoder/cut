@@ -165,6 +165,11 @@ class ExportService:
         self.generate_qr_code(f"{order_number}|{piece_name}|{dimensions}", qr_path)
         c.drawImage(qr_path, 35 * mm, 5 * mm, 12 * mm, 12 * mm)
 
+        barcode_path = output_path.replace(".pdf", "_barcode.png")
+        self.generate_barcode(f"{order_number}-{piece_name[:8]}", barcode_path)
+        if os.path.exists(barcode_path):
+            c.drawImage(barcode_path, 5 * mm, 1 * mm, 28 * mm, 6 * mm)
+
         c.save()
 
     def get_summary(self, task) -> dict:

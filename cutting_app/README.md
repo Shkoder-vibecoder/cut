@@ -39,6 +39,14 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Заполнение тестовыми данными
+
+```bash
+python seed_data.py --reset
+```
+
+Скрипт создаёт тестовые материалы, склад, заказы и изображение-превью листа в `assets/seed_sheet_preview.png`.
+
 ## Структура проекта
 
 ```
@@ -64,6 +72,22 @@ cutting_app/
 
 ```
 pytest tests/ -v
+```
+
+## Сборка дистрибутива
+
+```bash
+pyinstaller build.spec
+```
+
+Готовый бинарник появится в каталоге `dist/`.
+
+## Проверка критериев приемки
+
+```bash
+python -m pytest tests -v --cov=. --cov-report=term-missing
+python scripts/acceptance_benchmark.py --pieces 200
+python scripts/acceptance_benchmark.py --pieces 500
 ```
 
 ## Лицензия

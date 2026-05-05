@@ -43,6 +43,7 @@ class MainWindow(QMainWindow):
         self._setup_auto_save()
 
         self._update_status_bar()
+        self.tabs.currentChanged.connect(self._update_status_bar)
 
     def _setup_ui(self):
         central_widget = QWidget()
@@ -80,7 +81,16 @@ class MainWindow(QMainWindow):
         try:
             stock = self.stock_service.get_current_stock()
             total_sheets = sum(s["quantity"] for s in stock.values())
-            self.status_bar.showMessage(f"Склад: {total_sheets} листов | Готов к работе")
+            tasks = self.job_service.get_all_tasks()
+            last_done = next((t for t in reversed(tasks) if t.status == "done"), None)
+            kim = f"{(last_done.kim_percent or 0):.2f}%" if last_done else "-"
+            details = "-"
+            if last_done:
+                placements = self.job_service.get_task_placements(last_done.id)
+                details = str(len(placements))
+            self.status_bar.showMessage(
+                f"Склад: {total_sheets} листов | КИМ: {kim} | Размещено деталей: {details}"
+            )
         except Exception:
             pass
 

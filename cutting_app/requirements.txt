@@ -8,3 +8,4 @@ qrcode>=7.4
 python-barcode>=0.15
 pytest>=7.4
 pytest-cov>=4.0
+pyinstaller>=6.0

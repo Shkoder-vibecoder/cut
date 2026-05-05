@@ -11,6 +11,7 @@ class Sheet:
     stock_sheet_id: int
     texture: str = "none"
     index: int = 0
+    quantity: int = 1
 
 
 @dataclass

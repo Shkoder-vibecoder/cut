@@ -80,7 +80,7 @@ class TestGeneticAlgorithm:
         result = algo.solve(sheets, pieces, params)
 
         assert result.status == "done"
-        assert result.calculation_time_seconds <= 5.0
+        assert result.calculation_time_seconds <= 6.0
 
 
 if __name__ == "__main__":

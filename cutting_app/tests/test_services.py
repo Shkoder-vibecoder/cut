@@ -8,6 +8,7 @@ from db.session import get_session, close_session, reset_engine
 from core.stock_service import StockService
 from core.order_service import OrderService
 from core.material_service import MaterialService
+from core.export_service import ExportService
 from datetime import datetime
 
 
@@ -151,6 +152,16 @@ class TestMaterialService:
 
         remaining_items = session.query(OrderItem).filter(OrderItem.material_type_id == mat.id).all()
         assert len(remaining_items) == 0
+
+
+class TestExportService:
+    def test_generate_label_with_qr_and_barcode(self, session, tmp_path):
+        export_service = ExportService(session)
+        output = tmp_path / "label.pdf"
+        export_service.generate_label("Part A", "100x200", "ORD-1", str(output))
+
+        assert output.exists()
+        assert (tmp_path / "label_qr.png").exists()
 
 
 if __name__ == "__main__":

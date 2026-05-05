@@ -169,30 +169,55 @@ class ResultView(QWidget):
         layout.addWidget(summary_table)
 
     def _load_tasks(self):
+        current_task_id = self.task_combo.currentData()
         self.task_combo.clear()
         tasks = self.job_service.get_all_tasks()
         for t in tasks:
             self.task_combo.addItem(f"{t.id} - {t.order_id} ({t.status})", t.id)
+        if current_task_id is not None:
+            idx = self.task_combo.findData(current_task_id)
+            if idx >= 0:
+                self.task_combo.setCurrentIndex(idx)
+
+    def refresh_data(self):
+        self._load_tasks()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._load_tasks()
 
     def _load_selected_task(self):
         task_id = self.task_combo.currentData()
-        if not task_id:
+        if task_id is None:
+            QMessageBox.warning(self, "Внимание", "Выберите задание из списка")
             return
 
         self._current_task = self.job_service.get_task(task_id)
         if not self._current_task:
+            QMessageBox.warning(self, "Внимание", "Задание не найдено")
             return
 
         self._current_sheet_index = 0
-        self._draw_current_sheet()
+        if not self._draw_current_sheet():
+            QMessageBox.information(
+                self,
+                "Информация",
+                "Для выбранного задания пока нет сохраненных листов раскроя.",
+            )
 
     def _draw_current_sheet(self):
         if not self._current_task:
-            return
+            return False
 
         task_sheets = self.job_service.get_task_sheets(self._current_task.id)
         if not task_sheets or self._current_sheet_index >= len(task_sheets):
-            return
+            self.canvas.clear_canvas()
+            self.sheet_label.setText("Лист: -")
+            self.info_label.setText("КИМ: - | Деталей на листе: -")
+            self.summary_table.setRowCount(0)
+            self.btn_prev_sheet.setEnabled(False)
+            self.btn_next_sheet.setEnabled(False)
+            return False
 
         current_ts = task_sheets[self._current_sheet_index]
         stock_sheet = current_ts.stock_sheet
@@ -231,13 +256,20 @@ class ResultView(QWidget):
 
         self.btn_prev_sheet.setEnabled(self._current_sheet_index > 0)
         self.btn_next_sheet.setEnabled(self._current_sheet_index < total_sheets - 1)
+        return True
 
     def _prev_sheet(self):
+        if not self._current_task:
+            QMessageBox.warning(self, "Внимание", "Сначала загрузите задание")
+            return
         if self._current_sheet_index > 0:
             self._current_sheet_index -= 1
             self._draw_current_sheet()
 
     def _next_sheet(self):
+        if not self._current_task:
+            QMessageBox.warning(self, "Внимание", "Сначала загрузите задание")
+            return
         task_sheets = self.job_service.get_task_sheets(self._current_task.id)
         if self._current_sheet_index < len(task_sheets) - 1:
             self._current_sheet_index += 1
@@ -268,7 +300,32 @@ class ResultView(QWidget):
                 QMessageBox.information(self, "Успех", f"Сохранено: {path}")
 
     def _export_labels(self):
-        QMessageBox.information(self, "Информация", "Генерация этикеток...")
+        if not self._current_task:
+            QMessageBox.warning(self, "Внимание", "Загрузите задание")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(self, "Сохранить этикетки", "", "PDF Files (*.pdf)")
+        if not path:
+            return
+
+        task_sheets = self.job_service.get_task_sheets(self._current_task.id)
+        generated = 0
+        for ts in task_sheets:
+            placements = self.session.query(Placement).filter(Placement.task_sheet_id == ts.id).all()
+            for idx, pl in enumerate(placements, start=1):
+                item = pl.order_item
+                if not item:
+                    continue
+                label_path = path.replace(".pdf", f"_sheet{ts.sheet_index + 1}_item{idx}.pdf")
+                self.export_service.generate_label(
+                    piece_name=item.name,
+                    dimensions=f"{pl.width_mm}x{pl.height_mm}",
+                    order_number=self._current_task.order_id,
+                    output_path=label_path,
+                )
+                generated += 1
+
+        QMessageBox.information(self, "Успех", f"Сгенерировано этикеток: {generated}")
 
     def _zoom_in(self):
         if hasattr(self.canvas, '_zoom'):
