@@ -6,24 +6,26 @@ class GreedyAlgorithm(BaseCuttingAlgorithm):
         sorted_pieces = self._sort_pieces_by_area(pieces)
         placements = []
         sheet_states = []
+        used_state_indices = set()
 
         for s in sheets:
             for _ in range(getattr(s, 'quantity', 1)):
                 sheet_states.append(SheetState(s.id, s.width, s.height, s.stock_sheet_id, s.texture))
 
         for piece in sorted_pieces:
-            placed = False
             orientations = [(piece.width, piece.height)]
             if piece.rotation_allowed:
                 orientations.append((piece.height, piece.width))
+            if piece.fibers != "any":
+                allowed_textures = ["none", piece.fibers]
+            else:
+                allowed_textures = ["none", "horizontal", "vertical"]
+
+            best_candidate = None
+            best_score = None
 
             for pw, ph in orientations:
-                if piece.fibers != "any":
-                    allowed_textures = ["none", piece.fibers]
-                else:
-                    allowed_textures = ["none", "horizontal", "vertical"]
-
-                for state in sheet_states:
+                for state_idx, state in enumerate(sheet_states):
                     if state.texture not in allowed_textures:
                         continue
 
@@ -37,47 +39,73 @@ class GreedyAlgorithm(BaseCuttingAlgorithm):
                         continue
 
                     pos = self._find_position(state, pw, ph, params)
-                    if pos is not None:
-                        placement = PlacementResult(
-                            piece_id=piece.id,
-                            sheet_id=state.sheet_id,
-                            x=pos[0],
-                            y=pos[1],
-                            width=pw,
-                            height=ph,
-                            rotated=(pw != piece.width)
-                        )
-                        placements.append(placement)
-                        state.add_placement(pos[0], pos[1], pw, ph, params.cut_width)
-                        placed = True
-                        break
-                if placed:
-                    break
+                    if pos is None:
+                        continue
 
-        used_sheet_ids = set(p.sheet_id for p in placements)
+                    score = (state_idx, pos[1], pos[0], abs(pw - ph))
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        best_candidate = (state_idx, state, pos, pw, ph)
+
+            if best_candidate is not None:
+                state_idx, state, pos, pw, ph = best_candidate
+                placement = PlacementResult(
+                    piece_id=piece.id,
+                    sheet_id=state.sheet_id,
+                    x=pos[0],
+                    y=pos[1],
+                    width=pw,
+                    height=ph,
+                    rotated=(pw != piece.width)
+                )
+                placements.append(placement)
+                state.add_placement(pos[0], pos[1], pw, ph, params.cut_width)
+                used_state_indices.add(state_idx)
+
         total_piece_area = sum(p.width * p.height for p in pieces)
-        total_sheet_area = sum(s.width * s.height for s in sheet_states if s.sheet_id in used_sheet_ids)
+        total_sheet_area = sum(
+            sheet_states[idx].width * sheet_states[idx].height for idx in used_state_indices
+        )
 
         result = CuttingResult()
         result.placements = placements
-        result.total_sheets_used = len(used_sheet_ids)
+        result.total_sheets_used = len(used_state_indices)
         result.kim_percent = (total_piece_area / total_sheet_area * 100) if total_sheet_area > 0 else 0.0
         result.status = "done"
         result.message = "Completed"
         return result
 
     def _find_position(self, state: "SheetState", pw: float, ph: float, params: CuttingParams) -> tuple[float, float] | None:
-        step = 20.0
-        min_x = int(params.edge_offset)
-        min_y = int(params.edge_offset)
-        max_x = int(state.width - pw - params.edge_offset)
-        max_y = int(state.height - ph - params.edge_offset)
+        min_x = float(params.edge_offset)
+        min_y = float(params.edge_offset)
+        max_x = float(state.width - pw - params.edge_offset)
+        max_y = float(state.height - ph - params.edge_offset)
         if max_x < min_x or max_y < min_y:
             return None
-        for x in range(min_x, max_x + 1, int(step)):
-            for y in range(min_y, max_y + 1, int(step)):
-                if state.can_place(x, y, pw, ph, params.cut_width, params.edge_offset):
-                    return (float(x), float(y))
+
+        candidate_x = {min_x}
+        candidate_y = {min_y}
+        for px, py, placed_w, placed_h in state.placements:
+            candidate_x.add(px + placed_w + params.cut_width)
+            candidate_y.add(py + placed_h + params.cut_width)
+
+        sorted_x = sorted(x for x in candidate_x if min_x <= x <= max_x)
+        sorted_y = sorted(y for y in candidate_y if min_y <= y <= max_y)
+
+        best_pos = None
+        best_score = None
+        for y in sorted_y:
+            for x in sorted_x:
+                if not state.can_place(x, y, pw, ph, params.cut_width, params.edge_offset):
+                    continue
+                # Lower score is better: keep pieces compact in top-left area.
+                score = y * 1_000_000 + x
+                if best_score is None or score < best_score:
+                    best_score = score
+                    best_pos = (x, y)
+
+        if best_pos is not None:
+            return best_pos
         return None
 
 

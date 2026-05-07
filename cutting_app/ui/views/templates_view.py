@@ -167,7 +167,9 @@ class TemplateDialog(QDialog):
         rotation = QCheckBox("Вращение")
         rotation.setChecked(True)
         fibers = QComboBox()
-        fibers.addItems(["any", "horizontal", "vertical"])
+        fibers.addItem("Любое", "any")
+        fibers.addItem("Горизонтальное", "horizontal")
+        fibers.addItem("Вертикальное", "vertical")
 
         if data:
             name.setText(data.get("name", ""))
@@ -175,7 +177,7 @@ class TemplateDialog(QDialog):
             height.setValue(data.get("height_mm", 100))
             qty.setValue(data.get("quantity", 1))
             rotation.setChecked(data.get("rotation", True))
-            idx = fibers.findText(data.get("fibers", "any"))
+            idx = fibers.findData(data.get("fibers", "any"))
             if idx >= 0:
                 fibers.setCurrentIndex(idx)
 
@@ -221,7 +223,7 @@ class TemplateDialog(QDialog):
                 "height_mm": row["height"].value(),
                 "quantity": row["qty"].value(),
                 "rotation": row["rotation"].isChecked(),
-                "fibers": row["fibers"].currentText(),
+                "fibers": row["fibers"].currentData(),
                 "material_type_id": 1
             })
         return positions

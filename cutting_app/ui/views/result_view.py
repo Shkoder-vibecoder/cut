@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPen, QBrush, QPainter, QFont
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QGraphicsRectItem, QGraphicsTextItem
 from db.models import TaskSheet, Placement, CuttingTask
+from ui.localization import TASK_STATUS_LABELS, label_for
 
 
 class CanvasView(QGraphicsView):
@@ -173,7 +174,10 @@ class ResultView(QWidget):
         self.task_combo.clear()
         tasks = self.job_service.get_all_tasks()
         for t in tasks:
-            self.task_combo.addItem(f"{t.id} - {t.order_id} ({t.status})", t.id)
+            self.task_combo.addItem(
+                f"{t.id} - {t.order_id} ({label_for(TASK_STATUS_LABELS, t.status)})",
+                t.id,
+            )
         if current_task_id is not None:
             idx = self.task_combo.findData(current_task_id)
             if idx >= 0:

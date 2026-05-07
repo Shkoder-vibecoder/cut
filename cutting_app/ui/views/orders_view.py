@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTab
 from PyQt6.QtCore import Qt
 from db.models import Order, OrderItem
 from utils.importer import Importer
+from ui.localization import ORDER_STATUS_LABELS, FIBERS_LABELS, label_for
 
 
 class OrdersView(QWidget):
@@ -54,7 +55,7 @@ class OrdersView(QWidget):
         for i, o in enumerate(orders):
             self.orders_table.setItem(i, 0, QTableWidgetItem(o.order_number))
             self.orders_table.setItem(i, 1, QTableWidgetItem(o.client or ""))
-            self.orders_table.setItem(i, 2, QTableWidgetItem(o.status))
+            self.orders_table.setItem(i, 2, QTableWidgetItem(label_for(ORDER_STATUS_LABELS, o.status)))
             self.orders_table.setItem(i, 3, QTableWidgetItem(str(o.created_at)))
             self.orders_table.setItem(i, 4, QTableWidgetItem(str(o.updated_at)))
         self.orders_table.resizeColumnsToContents()
@@ -130,7 +131,7 @@ class OrdersView(QWidget):
             height = float(dialog.height_input.text())
             quantity = dialog.quantity_spin.value()
             rotation = dialog.rotation_check.isChecked()
-            fibers = dialog.fibers_combo.currentText()
+            fibers = dialog.fibers_combo.currentData()
             priority = dialog.priority_spin.value()
 
             self.order_service.add_order_item(order_number, material_type_id, name, width, height, quantity, rotation, fibers, priority)
@@ -210,7 +211,9 @@ class OrderItemDialog(QDialog):
 
         self.fibers_combo = QComboBox()
         self.fibers_combo.setToolTip("Выберите требуемое направление волокон")
-        self.fibers_combo.addItems(["any", "horizontal", "vertical"])
+        self.fibers_combo.addItem("Любое", "any")
+        self.fibers_combo.addItem("Горизонтальное", "horizontal")
+        self.fibers_combo.addItem("Вертикальное", "vertical")
 
         self.priority_spin = QSpinBox()
         self.priority_spin.setRange(0, 100)
@@ -259,7 +262,8 @@ class ItemsDialog(QDialog):
             self.table.setItem(i, 4, QTableWidgetItem(str(item.height_mm)))
             self.table.setItem(i, 5, QTableWidgetItem(str(item.quantity)))
             self.table.setItem(i, 6, QTableWidgetItem("Да" if item.rotation else "Нет"))
-            self.table.setItem(i, 7, QTableWidgetItem(item.fibers))
+            fibers_label = label_for(FIBERS_LABELS, item.fibers)
+            self.table.setItem(i, 7, QTableWidgetItem(fibers_label))
         self.table.resizeColumnsToContents()
 
         btn_close = QPushButton("Закрыть")

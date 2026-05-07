@@ -1,25 +1,64 @@
 import random
 import time
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 import numpy as np
 from algorithms.base import BaseCuttingAlgorithm, Sheet, Piece, CuttingParams, CuttingResult, PlacementResult
 from algorithms.greedy import GreedyAlgorithm, SheetState
 
 
+_LOGGER = logging.getLogger("cutting.genetic")
+
+
+def _get_logger() -> logging.Logger:
+    if _LOGGER.handlers:
+        return _LOGGER
+
+    log_dir = Path(__file__).resolve().parents[1] / "logs"
+    log_dir.mkdir(exist_ok=True)
+    handler = RotatingFileHandler(
+        log_dir / "genetic.log",
+        maxBytes=1_000_000,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+    handler.setFormatter(formatter)
+
+    _LOGGER.setLevel(logging.INFO)
+    _LOGGER.addHandler(handler)
+    _LOGGER.propagate = False
+    return _LOGGER
+
+
 class GeneticAlgorithm(BaseCuttingAlgorithm):
     def solve(self, sheets: list[Sheet], pieces: list[Piece], params: CuttingParams) -> CuttingResult:
+        logger = _get_logger()
         start_time = time.time()
         result = CuttingResult()
 
         sorted_pieces = self._sort_pieces_by_area(pieces)
-        piece_ids = [p.id for p in sorted_pieces]
+        piece_indices = list(range(len(sorted_pieces)))
 
         population_size = params.population_size
         generations = params.generations
         mutation_rate = params.mutation_rate
         crossover_rate = params.crossover_rate
 
+        logger.info(
+            "GA started: pieces=%d sheets=%d population=%d generations=%d mutation=%.4f crossover=%.4f time_limit=%s",
+            len(sorted_pieces),
+            len(sheets),
+            population_size,
+            generations,
+            mutation_rate,
+            crossover_rate,
+            params.time_limit_seconds,
+        )
+
         def create_chromosome() -> list[int]:
-            chrom = piece_ids.copy()
+            chrom = piece_indices.copy()
             random.shuffle(chrom)
             return chrom
 
@@ -30,7 +69,7 @@ class GeneticAlgorithm(BaseCuttingAlgorithm):
                 edge_offset=params.edge_offset,
                 cut_type=params.cut_type
             )
-            pieces_order = [p for p in sorted_pieces if p.id in chrom]
+            pieces_order = [sorted_pieces[i] for i in chrom]
             res = greedy.solve(sheets, pieces_order, temp_params)
             return res.kim_percent
 
@@ -75,10 +114,11 @@ class GeneticAlgorithm(BaseCuttingAlgorithm):
             selected = random.sample(list(zip(population, fitnesses)), k)
             return max(selected, key=lambda x: x[1])[0]
 
-        if not piece_ids:
+        if not piece_indices:
             result.status = "done"
             result.message = "No pieces to cut"
             result.calculation_time_seconds = time.time() - start_time
+            logger.info("GA finished: no pieces to cut")
             return result
 
         population = [create_chromosome() for _ in range(population_size)]
@@ -113,10 +153,24 @@ class GeneticAlgorithm(BaseCuttingAlgorithm):
                 best_chrom = population[current_best_idx].copy()
 
             if params.time_limit_seconds and (time.time() - start_time) > params.time_limit_seconds:
+                logger.warning(
+                    "GA stopped by time limit at generation=%d elapsed=%.2fs",
+                    gen + 1,
+                    time.time() - start_time,
+                )
                 break
 
+            if (gen + 1) % 10 == 0:
+                logger.info(
+                    "GA progress: generation=%d/%d best_kim=%.4f elapsed=%.2fs",
+                    gen + 1,
+                    generations,
+                    best_fitness,
+                    time.time() - start_time,
+                )
+
         greedy = GreedyAlgorithm()
-        pieces_order = [p for p in sorted_pieces if p.id in best_chrom]
+        pieces_order = [sorted_pieces[i] for i in best_chrom]
         final_result = greedy.solve(sheets, pieces_order, params)
 
         result.placements = final_result.placements
@@ -125,5 +179,13 @@ class GeneticAlgorithm(BaseCuttingAlgorithm):
         result.status = "done"
         result.message = f"GA completed with KIM {result.kim_percent:.2f}%"
         result.calculation_time_seconds = time.time() - start_time
+
+        logger.info(
+            "GA finished: kim=%.4f sheets_used=%d placements=%d elapsed=%.2fs",
+            result.kim_percent,
+            result.total_sheets_used,
+            len(result.placements),
+            result.calculation_time_seconds,
+        )
 
         return result

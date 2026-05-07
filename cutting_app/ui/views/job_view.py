@@ -17,21 +17,8 @@ from algorithms.base import CuttingParams, Sheet, Piece
 from algorithms.greedy import GreedyAlgorithm
 from algorithms.genetic import GeneticAlgorithm
 from algorithms.annealing import AnnealingAlgorithm
-from config import MAX_CUTTING_PIECES, MAX_CUTTING_TIME_SECONDS
-
-
-ALGORITHM_LABELS = {
-    "greedy": "Жадный",
-    "genetic": "Генетический",
-    "annealing": "Отжиг",
-}
-
-TASK_STATUS_LABELS = {
-    "pending": "Ожидание",
-    "running": "Выполняется",
-    "done": "Готово",
-    "failed": "Ошибка",
-}
+from config import MAX_CUTTING_PIECES, MAX_CUTTING_TIME_SECONDS, DEFAULT_EDGE_OFFSET
+from ui.localization import ALGORITHM_LABELS, TASK_STATUS_LABELS
 
 
 class AlgorithmWorker(QObject):
@@ -103,7 +90,7 @@ class JobView(QWidget):
 
         self.edge_offset_spin = QDoubleSpinBox()
         self.edge_offset_spin.setRange(0, 50.0)
-        self.edge_offset_spin.setValue(10.0)
+        self.edge_offset_spin.setValue(DEFAULT_EDGE_OFFSET)
         self.edge_offset_spin.setSuffix(" мм")
         self.edge_offset_spin.setToolTip("Минимальный отступ деталей от края листа")
 

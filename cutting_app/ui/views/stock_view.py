@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QDialog, QFormLayout, QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QLabel, QMessageBox
 from PyQt6.QtCore import Qt
 from db.models import StockSheet
+from ui.localization import TEXTURE_LABELS, MOVEMENT_REASON_LABELS, label_for
 
 
 class StockView(QWidget):
@@ -48,7 +49,7 @@ class StockView(QWidget):
         for i, s in enumerate(sheets):
             self.stock_table.setItem(i, 0, QTableWidgetItem(str(s.id)))
             self.stock_table.setItem(i, 1, QTableWidgetItem(s.format.name if s.format else ""))
-            self.stock_table.setItem(i, 2, QTableWidgetItem(s.texture))
+            self.stock_table.setItem(i, 2, QTableWidgetItem(label_for(TEXTURE_LABELS, s.texture)))
             self.stock_table.setItem(i, 3, QTableWidgetItem(str(s.price)))
             self.stock_table.setItem(i, 4, QTableWidgetItem(str(s.quantity)))
             self.stock_table.setItem(i, 5, QTableWidgetItem(str(len(s.defects_json)) if s.defects_json else ""))
@@ -61,7 +62,7 @@ class StockView(QWidget):
         dialog = StockDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             format_id = dialog.format_combo.currentData()
-            texture = dialog.texture_combo.currentText()
+            texture = dialog.texture_combo.currentData()
             price = dialog.price_spin.value()
             quantity = dialog.quantity_spin.value()
             self.stock_service.add_stock_sheet(format_id, texture, price, quantity)
@@ -79,7 +80,7 @@ class StockView(QWidget):
         dialog = StockDialog(self, sheet)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             format_id = dialog.format_combo.currentData()
-            texture = dialog.texture_combo.currentText()
+            texture = dialog.texture_combo.currentData()
             price = dialog.price_spin.value()
             quantity = dialog.quantity_spin.value()
             self.stock_service.update_stock_sheet(sheet_id, quantity=quantity, price=price, texture=texture)
@@ -121,7 +122,9 @@ class StockDialog(QDialog):
 
         self.texture_combo = QComboBox()
         self.texture_combo.setToolTip("Выберите направление текстуры/волокон")
-        self.texture_combo.addItems(["none", "horizontal", "vertical"])
+        self.texture_combo.addItem("Без направления", "none")
+        self.texture_combo.addItem("Горизонтальная", "horizontal")
+        self.texture_combo.addItem("Вертикальная", "vertical")
 
         self.price_spin = QDoubleSpinBox()
         self.price_spin.setRange(0, 100000)
@@ -138,7 +141,7 @@ class StockDialog(QDialog):
                 if self.format_combo.itemData(i) == stock_sheet.format_id:
                     self.format_combo.setCurrentIndex(i)
                     break
-            idx = self.texture_combo.findText(stock_sheet.texture)
+            idx = self.texture_combo.findData(stock_sheet.texture)
             if idx >= 0:
                 self.texture_combo.setCurrentIndex(idx)
             self.price_spin.setValue(stock_sheet.price)
@@ -179,7 +182,7 @@ class MovementsDialog(QDialog):
             self.table.setItem(i, 0, QTableWidgetItem(str(m.id)))
             self.table.setItem(i, 1, QTableWidgetItem(str(m.stock_sheet_id)))
             self.table.setItem(i, 2, QTableWidgetItem(str(m.delta)))
-            self.table.setItem(i, 3, QTableWidgetItem(m.reason))
+            self.table.setItem(i, 3, QTableWidgetItem(label_for(MOVEMENT_REASON_LABELS, m.reason)))
             self.table.setItem(i, 4, QTableWidgetItem(str(m.created_at)))
         self.table.resizeColumnsToContents()
 
